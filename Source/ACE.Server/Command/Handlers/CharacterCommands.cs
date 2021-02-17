@@ -7,6 +7,8 @@ using ACE.Entity.Enum;
 using ACE.Server.Entity;
 using ACE.Server.Managers;
 using ACE.Server.Network;
+using ACE.Server.Network.GameEvent.Events;
+using ACE.Server.Network.GameMessages.Messages;
 using ACE.Server.WorldObjects;
 
 namespace ACE.Server.Command.Handlers
@@ -85,6 +87,26 @@ namespace ACE.Server.Command.Handlers
 
 
             CommandHandlerHelper.WriteOutputInfo(session, $"Successfully {(isOnline ? "booted and " : "")}deleted character {foundPlayer.Name} (0x{foundPlayer.Guid}).", ChatMessageType.Broadcast);
+        }
+
+        [CommandHandler("swapgender", AccessLevel.Developer, CommandHandlerFlag.RequiresWorld, "Swaps a characters gender")]
+        public static void HandleSwapGender(Session session, params string[] parameters)
+        {
+            var player = session.Player;
+            var currentGender = (Gender)session.Player.Gender;
+            if (currentGender == Gender.Invalid)
+            {
+                CommandHandlerHelper.WriteOutputInfo(session, $"There is no defined gender yet for {player.Name} in the database.", ChatMessageType.Broadcast);
+                return;
+            }
+
+            session.Player.Gender = currentGender == Gender.Male ? (int)Gender.Female : (int)Gender.Male;
+            session.Player.SavePlayerToDatabase();
+
+            session.Network.EnqueueSend(new GameMessagePublicUpdatePropertyInt(session.Player, ACE.Entity.Enum.Properties.PropertyInt.Gender, session.Player.Gender.Value));
+
+            CommandHandlerHelper.WriteOutputInfo(session, $"Successfully swapped {player.Name}'s gender. (0x{player.Guid}). Use the barbershop window to complete the update.", ChatMessageType.Broadcast);
+            session.Network.EnqueueSend(new GameEventStartBarber(session)); // Open barbershop for player which will update their model on save.
         }
     }
 }
